@@ -1,42 +1,36 @@
 """
-Builds the BERT encoder + GPT-2 decoder Frankenstein model.
+Builds the BERT encoder + GPT-2 (small, 124M) decoder Frankenstein model.
+This uses:
+- Encoder: bert-base-uncased
+- Decoder: gpt2 (NOT gpt2-medium)
 """
 
 from transformers import EncoderDecoderModel
-
 
 def build_bert_gpt2_model(
     gpt_pad_token_id: int,
     gpt_bos_token_id: int,
     decoder_tokenizer=None,
 ):
-    """
-    Creates a BERT encoder + GPT-2-medium decoder with cross-attention.
-
-    We keep BERT at its native max_position_embeddings (=512) to avoid
-    version-dependent hacks. Make sure MAX_SOURCE_LEN <= 512 in the notebook.
-    """
-
-    # 1. Create the Franken-model
     model = EncoderDecoderModel.from_encoder_decoder_pretrained(
         "bert-base-uncased",
-        "gpt2-medium",
+        "gpt2",          # <-- small GPT-2
     )
 
-    # 2. Disable caching (better for training + ROCm)
+    # Disable caching (needed for training/ROCm/gradient checkpointing)
     model.config.use_cache = False
     model.decoder.config.use_cache = False
 
-    # 3. Core encoder-decoder config
+    # Core encoder-decoder config
     model.config.decoder_start_token_id = gpt_bos_token_id
     model.config.pad_token_id = gpt_pad_token_id
     model.config.vocab_size = model.config.decoder.vocab_size
 
-    # 4. If tokenizer has been modified (pad token added), resize GPT-2 embeddings
+    # Resize embedding layer if tokenizer was expanded (pad token)
     if decoder_tokenizer is not None:
         model.decoder.resize_token_embeddings(len(decoder_tokenizer))
 
-    # 5. Generation configuration
+    # Generation defaults
     gen_cfg = model.generation_config
     gen_cfg.pad_token_id = gpt_pad_token_id
     gen_cfg.bos_token_id = gpt_bos_token_id
