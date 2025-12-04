@@ -2,33 +2,39 @@ import os
 import time
 import requests
 
-# OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
-OPENROUTER_KEY = "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"
+# Load API key from environment variable
+OPENROUTER_KEY = os.getenv("OPENROUTER_API_KEY")
+
 BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-HEADERS = {
-    "Authorization": f"Bearer {OPENROUTER_KEY}",
-    "Content-Type": "application/json",
-}
+
+def _get_headers():
+    """Get headers, checking that API key exists."""
+    if OPENROUTER_KEY is None:
+        raise RuntimeError(
+            "OPENROUTER_API_KEY environment variable not set.\n"
+            "Set it with: export OPENROUTER_API_KEY='your-key-here'\n"
+            "Or in Python: os.environ['OPENROUTER_API_KEY'] = 'your-key-here'"
+        )
+    return {
+        "Authorization": f"Bearer {OPENROUTER_KEY}",
+        "Content-Type": "application/json",
+    }
+
 
 REQUEST_TIMEOUT = (10, 60)  # (connect_timeout, read_timeout) in seconds
-MAX_RETRIES = 3              # how many times to retry on timeout
+MAX_RETRIES = 3
 
 
 def _reasoning_config_for_model(model: str) -> dict:
     """
     Return reasoning config for a given model name.
-
-    - Default: no reasoning ("effort": "none")
-    - Any GPT-5 family model: minimal reasoning
     """
     effort = "none"
-
-    # Strip provider prefix like "openai/gpt-5-mini"
     base = model.split("/")[-1]
 
     reasoning_models_minimal = (
-        "gpt-5",       # catches gpt-5, gpt-5-large, etc.
+        "gpt-5",
         "gpt-5-nano",
         "gpt-5-mini",
     )
@@ -48,11 +54,14 @@ def call_openrouter_llm(
     max_tokens: int = 128,
     temperature: float = 0.2,
 ):
-    if OPENROUTER_KEY is None:
-        raise RuntimeError(
-            "OPENROUTER_API_KEY not found in environment. Set it before running."
-        )
-
+    """
+    Call an LLM via OpenRouter API.
+    
+    Returns:
+        tuple: (response_text, latency_seconds)
+    """
+    headers = _get_headers()  # This will raise if key not set
+    
     payload = {
         "model": model,
         "max_tokens": max_tokens,
@@ -70,12 +79,12 @@ def call_openrouter_llm(
         try:
             resp = requests.post(
                 BASE_URL,
-                headers=HEADERS,
+                headers=headers,
                 json=payload,
-                timeout=REQUEST_TIMEOUT,  # <- key line
+                timeout=REQUEST_TIMEOUT,
             )
             t1 = time.time()
-            time.sleep(0.05)  # ~20 requests/sec ceiling
+            time.sleep(0.05)  # Rate limiting
 
             try:
                 data = resp.json()
@@ -94,11 +103,9 @@ def call_openrouter_llm(
 
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
             last_err = e
-            # exponential-ish backoff: 0.5s, 1s, 2s...
             if attempt < MAX_RETRIES:
                 time.sleep(0.5 * (2 ** (attempt - 1)))
             else:
                 break
 
-    # If we get here, all retries failed
     raise RuntimeError(f"OpenRouter request failed after {MAX_RETRIES} attempts: {last_err}")

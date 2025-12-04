@@ -180,6 +180,10 @@ def train_model(
 
             model.save_pretrained(ckpt_dir)
             tokenizer.save_pretrained(ckpt_dir)
+            
+            # NEW: Explicitly save generation config
+            if hasattr(model, 'generation_config'):
+                model.generation_config.save_pretrained(ckpt_dir)
 
         else:
             epochs_without_improvement += 1
