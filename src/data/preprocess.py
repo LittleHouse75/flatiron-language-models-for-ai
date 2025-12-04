@@ -61,9 +61,15 @@ class SummaryDataset(Dataset):
         input_ids = enc["input_ids"].squeeze(0)
         attention_mask = enc["attention_mask"].squeeze(0)
 
-        labels = dec["input_ids"].squeeze(0)
-        # Mask PAD tokens for cross-entropy loss
-        labels[labels == self.decoder_tokenizer.pad_token_id] = -100
+        # Retrieve labels and the decoder mask
+        labels = dec["input_ids"].squeeze(0).clone()
+        dec_mask = dec["attention_mask"].squeeze(0)
+
+        # CRITICAL FIX:
+        # Instead of looking for the specific pad_token_id (which might be the same as EOS),
+        # we use the attention_mask to find which tokens are padding (0).
+        # 1 = real token (including the first EOS), 0 = padding
+        labels[dec_mask == 0] = -100
 
         return {
             "input_ids": input_ids,
