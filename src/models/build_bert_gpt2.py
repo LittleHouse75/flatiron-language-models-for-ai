@@ -9,7 +9,7 @@ def build_bert_gpt2_model(
     gpt_pad_token_id: int,
     gpt_bos_token_id: int,
     decoder_tokenizer=None,
-    max_length: int = 128,  # NEW: configurable parameter
+    max_length: int = 128,  # configurable parameter
 ):
     """
     Build a BERT encoder + GPT-2 decoder model.
@@ -47,7 +47,7 @@ def build_bert_gpt2_model(
     gen_cfg = model.generation_config
     gen_cfg.pad_token_id = gpt_pad_token_id
     gen_cfg.bos_token_id = gpt_bos_token_id
-    gen_cfg.max_length = max_length  # CHANGED: use parameter
+    gen_cfg.max_length = max_length
     gen_cfg.min_length = 5
     gen_cfg.no_repeat_ngram_size = 3
     gen_cfg.early_stopping = True

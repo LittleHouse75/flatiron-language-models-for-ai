@@ -11,53 +11,59 @@ def generate_summary(
     decoder_tokenizer,
     text,
     device,
-    max_source_len,  # CHANGED: renamed for clarity
+    max_source_len, 
     max_target_len,
-    source_prefix: str = "",  # NEW: optional prefix
+    source_prefix: str = "",
 ):
     """
     Generate a summary for a single dialogue.
     
-    Parameters
-    ----------
-    model : transformers model
-        The encoder-decoder or seq2seq model
-    encoder_tokenizer : tokenizer
-        Tokenizer for encoding the input
-    decoder_tokenizer : tokenizer
-        Tokenizer for decoding the output
-    text : str
-        The dialogue text to summarize
-    device : torch.device
-        Device to run inference on
-    max_source_len : int
-        Maximum length for the source/input sequence
-    max_target_len : int
-        Maximum length for the generated summary
-    source_prefix : str
-        Optional prefix to prepend (e.g., "summarize: " for T5)
+    [... existing docstring ...]
     """
     # Apply prefix if specified
     prefixed_text = source_prefix + text
     
-    # Encode using the encoder tokenizer
-    enc = encoder_tokenizer(
-        prefixed_text,
-        return_tensors="pt",
-        truncation=True,
-        padding="max_length",
-        max_length=max_source_len,  # FIXED: use explicit length, not model_max_length
-    ).to(device)
+    # Store original settings to restore later
+    original_enc_padding = encoder_tokenizer.padding_side
+    original_dec_padding = decoder_tokenizer.padding_side
+    
+    try:
+        encoder_tokenizer.padding_side = "right"
+        decoder_tokenizer.padding_side = "right"
+        
+        # Encode the input
+        enc = encoder_tokenizer(
+            prefixed_text,
+            return_tensors="pt",
+            truncation=True,
+            padding="max_length",
+            max_length=max_source_len,
+        ).to(device)
 
-    with torch.no_grad():
-        out = model.generate(
-            input_ids=enc.input_ids,
-            attention_mask=enc.attention_mask,
-            max_length=max_target_len,
-        )
+        # Generate with no_grad for inference efficiency
+        model.eval()
+        with torch.no_grad():
+            out = model.generate(
+                input_ids=enc.input_ids,
+                attention_mask=enc.attention_mask,
+                max_length=max_target_len,
+            )
 
-    # Decode using the decoder tokenizer
-    return decoder_tokenizer.decode(out[0], skip_special_tokens=True)
+        # Decode the output (move to CPU first to free GPU memory)
+        out_cpu = out.cpu()
+        summary = decoder_tokenizer.decode(out_cpu[0], skip_special_tokens=True)
+        
+        # Explicitly delete tensors to free GPU memory
+        del enc, out
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
+        
+        return summary
+    
+    finally:
+        # ALWAYS restore original settings
+        encoder_tokenizer.padding_side = original_enc_padding
+        decoder_tokenizer.padding_side = original_dec_padding
 
 
 def qualitative_samples(
@@ -66,17 +72,25 @@ def qualitative_samples(
     encoder_tokenizer,
     decoder_tokenizer,
     device,
-    max_source_len,  # NEW: added this parameter
+    max_source_len,
     max_target_len,
-    source_prefix: str = "",  # NEW: optional prefix
+    source_prefix: str = "",
     n=5,
+    seed=42,  # Add seed parameter with default value
 ):
     """
     Print n random qualitative examples comparing model output to human summaries.
+    
+    Parameters
+    ----------
+    seed : int or None
+        Random seed for reproducible sampling. Set to None for different samples each run.
     """
-    print(f"--- {n} qualitative samples ---")
+    print(f"--- {n} qualitative samples (seed={seed}) ---")
 
-    samples = df.sample(n)
+    # Use the seed for reproducible sampling
+    samples = df.sample(n, random_state=seed)
+    
     for idx, row in samples.iterrows():
         dialog = row["dialogue"]
         ref = row["summary"]
