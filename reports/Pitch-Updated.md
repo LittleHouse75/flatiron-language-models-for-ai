@@ -7,6 +7,26 @@ November 29, 2025
 
 # Project Pitch: Dialogue Summarization with Transformer Models
 
+
+## Project Preface: Execution Update and Key Findings (December 2025)
+
+**BLUF: Strategy Validated, with Significant Learning Surprises**
+
+This project executed the three-phase experimental roadmap outlined below with no major deviations in scope. However, the comparative analysis yielded three distinct surprises that challenge conventional industry wisdom regarding the "buy vs. build" decision for NLP tasks.
+
+**1. The "Intelligence vs. Adherence" Surprise:**
+We initially assumed Frontier APIs (Experiment 3) would set the "quality ceiling" for summarization, trading only cost for performance. The data proved otherwise. While models like GPT-5 Mini and Claude 4.5 are undeniably "smarter," their training for conversational helpfulness made them verbose. They consistently underperformed the fine-tuned local models on ROUGE metrics (scoring ~32–35 ROUGE-L vs. BART's **42.13**) because they struggled to adopt the abrupt, terse style of the dataset without extensive few-shot prompting.
+
+**2. The Cost-Performance Decoupling:**
+Within the API experiment, we found that pricing was a poor predictor of performance. The open-weight Qwen 2.5 72B model ($0.07/M input) rivaled or beat proprietary models costing over 14x as much. This suggests that for summarization tasks, parameter efficiency and training data relevance outweigh raw model size.
+
+**3. The Validation of Specialized Architecture:**
+Experiment 2 (BART) shattered our success criteria, exceeding the ROUGE-L target of 35 by over 7 points. Conversely, Experiment 1 (Custom Encoder-Decoder) demonstrated that architectural validity does not guarantee training efficiency; the lack of pre-trained cross-attention required significantly more compute to achieve mediocre results.
+
+**Conclusion:**
+For high-volume, specific-style dialogue summarization, a **fine-tuned BART model** is not just the cost-effective choice—it is the performant one.
+
+
 ## Problem Statement and Proposed Solution
 
 ### Problem Description

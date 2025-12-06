@@ -1,152 +1,138 @@
-Dialogue Summarization with Transformer Models
 
-Proof-of-Concept for Automated Chat Summaries
-*Flatiron School – Final Capstone*
+# Dialogue Summarization: From Custom Architectures to Frontier LLMs
 
-### Overview
+**An investigation into the most effective architecture for summarizing informal chat logs.**
 
-Modern chat platforms bombard users with long, chaotic message threads. Important decisions and action items get buried in noise. This project builds a proof-of-concept summarization system that turns raw dialogues into short, accurate summaries.
+---
 
-The work follows a full data-science workflow:
-data exploration → model design → fine-tuning → evaluation → comparison → conclusions.
+## 1. Problem Statement & Business Context
 
-We evaluate three modeling strategies:
-1. **Experiment 1 – Custom Encoder–Decoder:**
+**The Problem: Information Overload**
+Modern work happens in chat applications (Slack, Teams, Discord). However, these platforms generate massive amounts of unstructured, noisy text. Employees spend significant time scrolling through back-and-forth messages to extract simple outcomes: decisions made, action items assigned, or meeting times agreed upon.
 
-⠀BERT encoder → GPT-2 decoder (cross-attention added via HuggingFace EncoderDecoderModel).
-2. **Experiment 2 – Purpose-Built Seq2Seq:**
+**The Solution**
+This project builds and evaluates automated systems capable of ingesting raw, messy dialogue and outputting concise, third-person summaries.
 
-⠀BART and T5, pretrained for summarization.
-3. **Experiment 3 – Frontier LLMs via API:**
+**The Constraints**
+*   **Input:** Informal, multi-speaker text with slang, typos, and non-standard grammar (SAMSum dataset).
+*   **Output:** High-compression summaries (median ~75% reduction) suitable for notification previews.
+*   **Production Viability:** The solution must balance accuracy (ROUGE scores) with inference latency and cost.
 
-⠀Zero-shot / instructed summarizers (GPT-4o-mini, Claude, etc.).
+---
 
-The dataset is **SAMSum**, a human-annotated messenger-style conversation corpus.
+## 2. Technical Approach
 
-⸻
+We evaluated three distinct architectural paradigms to solve this problem:
 
-### Key Features
-* End-to-end pipeline for dialogue summarization
-* Reusable preprocessing and training utilities (src/)
-* ROUGE-based evaluation across all model families
-* Side-by-side qualitative comparison
-* Saved checkpoints for reproducibility
-* Final report and video presentation delivered per flatiron requirements
+### **Experiment 1: The "Frankenstein" Architecture**
+*   **Model:** Custom `EncoderDecoderModel` combining **DistilBERT** (Encoder) + **DistilGPT-2** (Decoder).
+*   **Hypothesis:** Can we satisfy the requirement of a BERT-family encoder and autoregressive decoder by manually connecting two models that were never trained to communicate?
+*   **Result:** Functional, but inefficient training convergence due to randomly initialized cross-attention layers.
 
-⠀
-⸻
+### **Experiment 2: The Specialists (Seq2Seq)**
+*   **Models:** **BART** (Denoising Autoencoder) and **T5** (Text-to-Text Transfer Transformer).
+*   **Hypothesis:** Do purpose-built summarization architectures with pre-trained cross-attention outperform custom assemblies?
+*   **Result:** Significant performance gains in both convergence speed and final summary quality.
 
-### Project Structure
+### **Experiment 3: Frontier LLMs (Zero-Shot)**
+*   **Models:** **GPT-5 Mini**, **Gemini 2.5 Flash**, **Claude 4.5 Haiku**, **Qwen 2.5**, and **Kimi K2**.
+*   **Hypothesis:** Can massive zero-shot models accessing the world's knowledge beat smaller, fine-tuned local models?
+*   **Result:** High fluency, but often failed to match the specific terse style required by the dataset, leading to lower ROUGE scores.
 
-project-dialogue-summarization/
-│
-├── README.md
-├── requirements.txt
-├── .gitignore
-│
-├── data/
-│   ├── raw/                # direct pulls from SAMSum (unchanged)
-│   ├── interim/            # tokenized HF datasets / cached splits
-│   └── processed/          # final tensors ready for training
-│
-├── notebooks/
-│   ├── 00_intro_and_setup.ipynb
-│   ├── 01_eda.ipynb
-│   ├── 02_experiment1_bert_gpt2.ipynb
-│   ├── 03_experiment2_bart_t5.ipynb
-│   ├── 04_experiment3_api_models.ipynb
-│   ├── 05_evaluation_and_comparison.ipynb
-│   └── 06_conclusions.ipynb
-│
-├── src/
+---
+
+## 3. Results & Evaluation
+
+We evaluated all models on the **SAMSum test set** (819 examples) using ROUGE metrics and inference latency.
+
+### Key Findings
+
+1.  **Fine-Tuning Wins on Quality:** The **BART** model achieved the highest ROUGE-L score (**42.13**), beating the best Frontier API model (Gemini 2.5 Flash at **35.49**) by over 6 points.
+2.  **Speed:** Local models were significantly faster. BART averaged **0.2s** per summary, while the fastest API (Gemini) averaged **0.65s**, with some APIs lagging to 2.0s+.
+3.  **The "Intelligence" Trap:** Frontier LLMs were "smarter" but less obedient. They tended to add conversational filler or helpful context that, while correct, penalized them against the ground truth summaries which favor extreme brevity.
+
+| Model Category | Best Model | ROUGE-L | Latency (mean) | Cost at Scale |
+| :--- | :--- | :--- | :--- | :--- |
+| **Fine-Tuned Local** | **BART** | **42.13** | **~0.20s** | **~$0 (Compute)** |
+| Fine-Tuned Local | T5-Small | 39.08 | ~0.23s | ~$0 (Compute) |
+| Frontier API | Gemini 2.5 Flash | 35.49 | ~0.65s | High (Per Token) |
+| Custom Custom | Bert+GPT2 | 30.29 | ~0.40s | ~$0 (Compute) |
+
+---
+
+## 4. Repository Structure
+
+This project is organized as a series of sequential notebooks.
+
+```text
+.
+├── README.md                           # This report
+├── notebooks/                          # Core analysis and experiments
+│   ├── 00_introduction.ipynb           # Project overview and navigation
+│   ├── 01_eda.ipynb                    # Exploratory Data Analysis of SAMSum
+│   ├── 02_experiment1_bert_gpt2.ipynb  # Custom Encoder-Decoder implementation
+│   ├── 03_experiment2_bart_t5.ipynb    # BART and T5 Fine-tuning
+│   ├── 04_experiment3_api_models.ipynb # API benchmarking (OpenRouter)
+│   └── 05_evaluation_and_conclusions.ipynb # Final cross-model analysis
+├── reports/
+│   └── Pitch-Updated.md                # Evolution of project scope
+├── src/                                # Helper modules
 │   ├── data/
-│   │   ├── load_data.py           # dataset loading + splitting
-│   │   └── preprocess.py          # tokenization / truncation logic
-│   │
-│   ├── models/
-│   │   ├── build_bert_gpt2.py     # encoder-decoder glue model
-│   │   ├── build_bart.py
-│   │   └── build_t5.py
-│   │
-│   ├── train/
-│   │   ├── trainer_seq2seq.py     # training + eval loop
-│   │   └── callbacks.py           # early stopping / checkpointing
-│   │
-│   ├── eval/
-│   │   ├── rouge_eval.py
-│   │   └── qualitative.py
-│   │
-│   └── utils/
-│       ├── logging.py
-│       ├── config.py
-│       └── prompt_utils.py        # used for Experiment 3
-│
-├── models/
-│   ├── bert-gpt2/                 # exp1 checkpoints
-│   ├── bart/                      # exp2 checkpoints
-│   ├── t5/
-│   └── frontier_llm/              # prompt templates, cached outputs
-│
-├── experiments/
-│   ├── exp1_bert_gpt2_results/
-│   ├── exp2_bart_results/
-│   └── exp3_api_llm_results/
-│
-└── reports/
-    ├── pitch.pdf
-    ├── final_report.pdf
-    └── video_slides/
+│   │   └── load_data.py                # Dataset loading utilities
+│   └── eval/
+│       └── qualitative.py              # Qualitative sample generation
+├── models/                             # [Generated] Stores trained weights & logs
+└── experiments/                        # [Generated] Stores comparison plots
+```
 
+---
 
-⸻
+## 5. Reproduction Instructions
 
-### How to Run
+Because the fine-tuned models are too large for Git, they are **not checked into the repository**. You must reproduce them locally by running the notebooks.
 
-### 1. Install dependencies
+### Prerequisites
+*   Python 3.10+
+*   A GPU is highly recommended (Training code is optimized for CUDA/ROCm).
+*   **OpenRouter API Key** (Required only for notebook `04`).
 
-pip install -r requirements.txt
+### Setup
+```bash
+# Clone the repository
+git clone <repo_url>
+cd <repo_name>
 
-### 2. Run the notebooks
+# Install dependencies (assuming standard DS stack + transformers)
+pip install pandas numpy matplotlib torch transformers datasets evaluate rouge_score requests
+```
 
-The main workflow lives in:
-* notebooks/00_intro_and_setup.ipynb
-* …then progress sequentially through
+### Reproducing the Models
+To regenerate the model artifacts (weights, logs, predictions), you must run the notebooks in order.
 
-⠀EDA → Exp1 → Exp2 → Exp3 → Evaluation → Conclusions
+1.  **Open `notebooks/02_experiment1_bert_gpt2.ipynb`**
+    *   Set the flag `RUN_TRAINING = True` in the configuration cell.
+    *   Run all cells. This will train the DistilBERT+GPT2 model and save artifacts to `models/bert-gpt2-distil/`.
 
-### 3. Model weights
+2.  **Open `notebooks/03_experiment2_bart_t5.ipynb`**
+    *   Set `RUN_TRAINING_BART = True` and `RUN_TRAINING_T5 = True`.
+    *   Run all cells. This will train both models and save artifacts to `models/bart/` and `models/t5/`.
 
-Fine-tuned model weights are stored under:
+3.  **Open `notebooks/04_experiment3_api_models.ipynb`**
+    *   Set `RUN_API_CALLS = True`.
+    *   Start with `EVALUATION_MODE = "test"` (small sample) to verify your API key, then switch to `"full"` for the complete test set.
+    *   Run all cells to generate API predictions in `models/api-frontier/`.
 
-models/<model-name>/
+4.  **Final Analysis:**
+    *   Run `notebooks/05_evaluation_and_conclusions.ipynb` to generate the final comparison charts based on the artifacts created in steps 1-3.
 
-Use HuggingFace’s from_pretrained() to load them.
+---
 
-⸻
+## 6. Limitations & Future Work
 
-### Results (Short Summary)
+**Limitations**
+*   **Dataset Bias:** SAMSum focuses on casual, English-speaking, two-person dialogue. Performance may degrade on multi-party technical meetings or formal customer support threads.
+*   **Tail Latency:** While API models had decent average speed, their P95 latency (worst 5%) was often 5x-10x slower than local models, posing a risk for real-time applications.
 
-*(You’ll expand this section after training finishes.)*
-* BERT→GPT-2 works but trains slowly because cross-attention is randomly initialized.
-* BART/T5 produce stronger ROUGE scores with significantly less compute.
-* Frontier LLMs produce the best summaries but with real cost/latency trade-offs.
-* The final comparison notebook shows quality, latency, and cost across all three.
-
-⠀
-⸻
-
-### Deliverables
-* Jupyter notebooks with full pipeline
-* Saved checkpoints for all models
-* Evaluation metrics + qualitative analysis
-* Final 3–5 page PDF report
-* 7–10 minute video walkthrough
-* This repository README
-
-⠀
-⸻
-
-### License / Notes
-
-This project is for educational use within the Flatiron School AI/ML program.
-SAMSum dataset accessed via HuggingFace Datasets.pp
+**Future Work**
+*   **Quantization:** Attempting to run 4-bit quantized versions of Llama-3 or Mistral locally to see if we can bridge the gap between "dumb but fast" (BART) and "smart but slow" (GPT-4).
+*   **Human Evaluation:** ROUGE scores penalize synonyms. A human evaluation loop is needed to determine if the "verbose" API summaries are actually more useful to users despite lower metrics.[REDACTED]
