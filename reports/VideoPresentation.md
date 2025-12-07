@@ -7,13 +7,13 @@
 <br>
 
 <p align="center">
-  <a href="https://youtu.be/HKKwTUXuoGs">
+  <a href="https://youtu.be/2cLVG-OQu_w">
     <img src="https://github.com/LittleHouse75/flatiron-resources/blob/main/%20rouge_thumbnail.png?raw=true" 
          alt="Video Thumbnail" 
          width="70%">
   </a>
 </p>
 
-<p align="center"><em>Placeholder link. Video will be uploaded by midnight.</em></p>
+<p align="center"><em>Dialogue Summarization: From Custom Architectures to Frontier LLMs</em></p>
 
 ---
